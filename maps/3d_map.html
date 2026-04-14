@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>SF Family Zoning Plan — 3D height map (Fogline)</title>
+<title>SF Family Zoning Plan Visualized (Fogline)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
 <style>
@@ -86,14 +86,14 @@
 <div id="map"></div>
 
 <div class="overlay">
-  <h1>San Francisco in 3D — what the Family Zoning Plan actually allows</h1>
+  <h1>SF Family Zoning Plan Visualized</h1>
   <p>Each block is extruded to its maximum permitted height under the Family Zoning Plan.</p>
   <p>Grey blocks = not upzoned. Colored blocks = FZP <i>family-housing bonus</i> raised the cap. Use the toggle below to see what would happen if <b>Paris</b> or <b>Miami</b> rules applied to those same upzoned parcels.</p>
   <p><b>Drag</b> to pan · <b>right-drag</b> to tilt/rotate · <b>scroll</b> to zoom · <b>click</b> a block for details.</p>
   <div class="mode-toggle">
     <button class="mode-btn active" data-mode="fzp">Actual FZP heights</button>
-    <button class="mode-btn" data-mode="paris">If Paris rules applied (121 ft cap)</button>
-    <button class="mode-btn" data-mode="miami">If Miami rules applied (641 ft)</button>
+    <button class="mode-btn" data-mode="paris">Paris height (121 ft)</button>
+    <button class="mode-btn" data-mode="miami">Miami height (641 ft)</button>
   </div>
 </div>
 
@@ -212,8 +212,8 @@ map.on('load', () => {
 
   const MODES = {
     fzp:   { height: ['coalesce', ['get', 'local_m'], 0], color: fzpColorExpr,   title: 'FZP: family-housing bonus (ft)' },
-    paris: { height: parisHeightExpr,                     color: parisColorExpr, title: 'If Paris rules applied: 121 ft cap' },
-    miami: { height: miamiHeightExpr,                     color: miamiColorExpr, title: 'If Miami rules applied: 641 ft' },
+    paris: { height: parisHeightExpr,                     color: parisColorExpr, title: 'Paris height (121 ft)' },
+    miami: { height: miamiHeightExpr,                     color: miamiColorExpr, title: 'Miami height (641 ft)' },
   };
 
   const legendBodies = {
