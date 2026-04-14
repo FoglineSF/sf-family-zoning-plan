@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>SF Family Zoning Plan — 3D height map (Fogline)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  #map { position: absolute; inset: 0; }
+  .overlay {
+    position: absolute; top: 14px; left: 14px;
+    background: rgba(20, 20, 24, 0.82);
+    color: #f5f3ee;
+    padding: 14px 16px;
+    border-radius: 8px;
+    max-width: 340px;
+    box-shadow: 0 3px 14px rgba(0,0,0,0.3);
+    font-size: 13px;
+    line-height: 1.45;
+    backdrop-filter: blur(4px);
+  }
+  .overlay h1 {
+    font-size: 15px; margin: 0 0 4px 0; font-weight: 700;
+  }
+  .overlay p { margin: 4px 0; }
+  .mode-toggle {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .mode-btn {
+    appearance: none;
+    background: rgba(255,255,255,0.08);
+    color: #f5f3ee;
+    border: 1px solid rgba(255,255,255,0.2);
+    padding: 7px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
+    transition: background 120ms ease, border-color 120ms ease;
+  }
+  .mode-btn:hover {
+    background: rgba(255,255,255,0.15);
+  }
+  .mode-btn.active {
+    background: rgba(158, 31, 12, 0.45);
+    border-color: rgba(255, 220, 200, 0.6);
+    font-weight: 600;
+  }
+  .mode-btn.active[data-mode="paris"] {
+    background: rgba(74, 111, 160, 0.55);
+    border-color: rgba(200, 220, 255, 0.6);
+  }
+  .mode-btn.active[data-mode="miami"] {
+    background: rgba(29, 85, 112, 0.55);
+    border-color: rgba(200, 240, 255, 0.6);
+  }
+  .legend {
+    position: absolute; bottom: 18px; left: 14px;
+    background: rgba(20, 20, 24, 0.85);
+    color: #f5f3ee;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+  }
+  .legend-row { display: flex; align-items: center; margin: 3px 0; }
+  .legend-sw { width: 20px; height: 10px; margin-right: 8px; border: 1px solid #222; }
+  .popup { font-size: 13px; line-height: 1.5; }
+  .popup b { color: #4a1f08; }
+  .byline {
+    position: absolute; bottom: 18px; right: 14px;
+    background: rgba(20, 20, 24, 0.82);
+    color: #f5f3ee;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 11px;
+  }
+  .byline a { color: #9ec9ff; text-decoration: none; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="overlay">
+  <h1>San Francisco in 3D — what the Family Zoning Plan actually allows</h1>
+  <p>Each block is extruded to its maximum permitted height under the Family Zoning Plan.</p>
+  <p>Grey blocks = not upzoned. Colored blocks = FZP <i>family-housing bonus</i> raised the cap. Use the toggle below to see what would happen if <b>Paris</b> or <b>Miami</b> rules applied to those same upzoned parcels.</p>
+  <p><b>Drag</b> to pan · <b>right-drag</b> to tilt/rotate · <b>scroll</b> to zoom · <b>click</b> a block for details.</p>
+  <div class="mode-toggle">
+    <button class="mode-btn active" data-mode="fzp">Actual FZP heights</button>
+    <button class="mode-btn" data-mode="paris">If Paris rules applied (121 ft cap)</button>
+    <button class="mode-btn" data-mode="miami">If Miami rules applied (641 ft)</button>
+  </div>
+</div>
+
+<div class="legend" id="legend">
+  <div class="legend-title" id="legend-title" style="font-weight:700;margin-bottom:4px;">FZP: family-housing bonus (ft)</div>
+  <div id="legend-body">
+    <div class="legend-row"><div class="legend-sw" style="background:#bdbdbd"></div>no FZP bonus (Δ = 0 ft)</div>
+    <div class="legend-row"><div class="legend-sw" style="background:#ffe08a"></div>+10 to +30 ft</div>
+    <div class="legend-row"><div class="legend-sw" style="background:#fdae61"></div>+30 to +60 ft</div>
+    <div class="legend-row"><div class="legend-sw" style="background:#f46d43"></div>+60 to +120 ft</div>
+    <div class="legend-row"><div class="legend-sw" style="background:#a50026"></div>+120 ft and up</div>
+  </div>
+</div>
+
+<div class="byline">
+  Data: SF Planning · built by <a href="https://foglinesf.com" target="_blank">Fogline</a>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+const map = new maplibregl.Map({
+  container: 'map',
+  // Positron-style vector basemap from MapTiler's open-sourced demo tiles
+  style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+  center: [-122.445, 37.770],
+  zoom: 12.2,
+  pitch: 60,
+  bearing: -20,
+  antialias: true,
+  maxPitch: 80,
+});
+
+map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-right');
+
+map.on('load', () => {
+  map.addSource('heights', {
+    type: 'geojson',
+    data: 'data/height_districts_web.geojson',
+  });
+
+  // Color expression on delta_ft
+  const colorExpr = [
+    'interpolate',
+    ['linear'],
+    ['coalesce', ['get', 'delta_ft'], 0],
+    0,   '#bdbdbd',
+    10,  '#ffe08a',
+    30,  '#fdae61',
+    60,  '#f46d43',
+    120, '#d73027',
+    250, '#a50026',
+    400, '#67001f',
+  ];
+
+  // Extrusion height = local_m; base = 0 (ground)
+  map.addLayer({
+    id: 'heights-3d',
+    type: 'fill-extrusion',
+    source: 'heights',
+    paint: {
+      'fill-extrusion-color': colorExpr,
+      'fill-extrusion-height': ['coalesce', ['get', 'local_m'], 0],
+      'fill-extrusion-base': 0,
+      'fill-extrusion-opacity': 0.92,
+    },
+  });
+
+  // Thin outline layer
+  map.addLayer({
+    id: 'heights-outline',
+    type: 'line',
+    source: 'heights',
+    paint: {
+      'line-color': '#333',
+      'line-width': 0.3,
+      'line-opacity': 0.5,
+    },
+  });
+
+  // ---- Mode toggle: FZP / Paris / Miami ----
+  // Upzoned = any parcel where delta_ft > 0. In Paris / Miami modes those
+  // parcels get a uniform override height + override color, while non-upzoned
+  // parcels stay at their actual local_m and grey color.
+
+  const PARIS_HEIGHT_M = 37.0;   // 121 ft — Paris central city height limit (37m, 2023 Bioclimatic PLU)
+  const MIAMI_HEIGHT_M = 195.4;  // 641 ft — Porsche Design Tower, Sunny Isles
+
+  const fzpColorExpr = colorExpr;
+
+  const parisHeightExpr = [
+    'case',
+    ['>', ['coalesce', ['get', 'delta_ft'], 0], 0],
+    PARIS_HEIGHT_M,
+    ['coalesce', ['get', 'local_m'], 0],
+  ];
+  const parisColorExpr = [
+    'case',
+    ['>', ['coalesce', ['get', 'delta_ft'], 0], 0],
+    '#4a6fa0',
+    '#bdbdbd',
+  ];
+
+  const miamiHeightExpr = [
+    'case',
+    ['>', ['coalesce', ['get', 'delta_ft'], 0], 0],
+    MIAMI_HEIGHT_M,
+    ['coalesce', ['get', 'local_m'], 0],
+  ];
+  const miamiColorExpr = [
+    'case',
+    ['>', ['coalesce', ['get', 'delta_ft'], 0], 0],
+    '#1d5570',
+    '#bdbdbd',
+  ];
+
+  const MODES = {
+    fzp:   { height: ['coalesce', ['get', 'local_m'], 0], color: fzpColorExpr,   title: 'FZP: family-housing bonus (ft)' },
+    paris: { height: parisHeightExpr,                     color: parisColorExpr, title: 'If Paris rules applied: 121 ft cap' },
+    miami: { height: miamiHeightExpr,                     color: miamiColorExpr, title: 'If Miami rules applied: 641 ft' },
+  };
+
+  const legendBodies = {
+    fzp: `
+      <div class="legend-row"><div class="legend-sw" style="background:#bdbdbd"></div>no FZP bonus (Δ = 0 ft)</div>
+      <div class="legend-row"><div class="legend-sw" style="background:#ffe08a"></div>+10 to +30 ft</div>
+      <div class="legend-row"><div class="legend-sw" style="background:#fdae61"></div>+30 to +60 ft</div>
+      <div class="legend-row"><div class="legend-sw" style="background:#f46d43"></div>+60 to +120 ft</div>
+      <div class="legend-row"><div class="legend-sw" style="background:#a50026"></div>+120 ft and up</div>`,
+    paris: `
+      <div class="legend-row"><div class="legend-sw" style="background:#bdbdbd"></div>not upzoned (unchanged)</div>
+      <div class="legend-row"><div class="legend-sw" style="background:#4a6fa0"></div>upzoned → 121 ft (Paris city center limit)</div>
+      <div style="margin-top:6px;color:#c8d4e6;font-size:11px;">~8 stories. Same height limit that protects Paris's urban character under its Bioclimatic PLU.</div>`,
+    miami: `
+      <div class="legend-row"><div class="legend-sw" style="background:#bdbdbd"></div>not upzoned (unchanged)</div>
+      <div class="legend-row"><div class="legend-sw" style="background:#1d5570"></div>upzoned → 641 ft ("the Miami")</div>
+      <div style="margin-top:6px;color:#cce7ef;font-size:11px;">~60 stories. Height of the Porsche Design Tower in Sunny Isles, Miami — the archetype of "Miami-ification."</div>`,
+  };
+
+  function setMode(mode) {
+    const m = MODES[mode];
+    if (!m) return;
+    map.setPaintProperty('heights-3d', 'fill-extrusion-height', m.height);
+    map.setPaintProperty('heights-3d', 'fill-extrusion-color',  m.color);
+    document.getElementById('legend-title').textContent = m.title;
+    document.getElementById('legend-body').innerHTML = legendBodies[mode];
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+  }
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => setMode(btn.dataset.mode));
+  });
+
+  // Click popup
+  map.on('click', 'heights-3d', (e) => {
+    const f = e.features[0];
+    const p = f.properties;
+    const delta = p.delta_ft ?? 0;
+    const baseF = p.base_ft ?? '—';
+    const localF = p.local_ft ?? '—';
+    const label = p.height ?? '—';
+    const cond = p.condition ?? '';
+    const html = `
+      <div class="popup">
+        <b>Height district: ${label}</b><br>
+        Base: ${baseF} ft &nbsp; → &nbsp; Local Program: ${localF} ft<br>
+        Bonus: ${delta > 0 ? '+' + delta + ' ft' : 'none'}<br>
+        ${cond ? 'Condition: ' + cond : ''}
+      </div>`;
+    new maplibregl.Popup({ offset: 8 }).setLngLat(e.lngLat).setHTML(html).addTo(map);
+  });
+
+  map.on('mouseenter', 'heights-3d', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'heights-3d', () => { map.getCanvas().style.cursor = ''; });
+});
+</script>
+</body>
+</html>
